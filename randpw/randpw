@@ -1,0 +1,42 @@
+#!/usr/bin/env sh
+
+function show_help() {
+  name=$(basename ${0})
+  cat <<EOF
+Usage:
+  ${name} [length]
+  ${name} -h | -?
+
+Options:
+  -h, -?  Show this help message
+EOF
+  exit 0
+}
+
+# Reset getopts for the shell
+OPTIND=1
+
+# Options parsing
+while getopts "h?" opt; do
+  case "$opt" in
+    h|\?)
+      show_help
+      exit 0
+      ;;
+  esac
+done
+
+length=${1:-32}
+
+# MacOS uses POSIX utils by default
+case "$(uname -s)" in
+  Darwin*)
+    pw=$(dd if=/dev/urandom bs=1 count=${length} 2>/dev/null | base64 -b 0 | rev | cut -b 2- | rev)
+    ;;
+  *)
+    pw=$(dd if=/dev/urandom bs=1 count=${length} 2>/dev/null | base64 -w 0 | rev | cut -b 2- | rev)
+    ;;
+esac
+
+echo ${pw:0:${length}}
+exit 0
