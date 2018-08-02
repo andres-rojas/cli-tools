@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+function show_help() {
+  name=$(basename ${0})
+  cat <<EOF
+${name} will search the "Name" tag of your EC2 instances for the given QUERY
+and will ssh to the private IP of the first instance it finds.
+
+Usage:
+  ${name} QUERY
+  ${name} -h | -?
+
+Options:
+  -h, -?  Show this help message
+EOF
+  exit 0
+}
+
+# Reset getopts for the shell
+OPTIND=1
+
+# Options parsing
+while getopts "h?" opt; do
+  case "${opt}" in
+    h|\?)
+      show_help
+      exit 0
+      ;;
+  esac
+done
+
+function require() {
+  command -v "${1}" >/dev/null 2>&1 || {
+    echo >&2 "The ${2} tool is required to use this script!"
+    echo -e >&2 "\tSee: ${3}"
+    exit 1
+  }
+}
+
+require "aws" "AWS CLI" "https://docs.aws.amazon.com/cli/latest/userguide/installing.html"
+require "jq" "jq" "https://stedolan.github.io/jq/download/"
+
+ssh $(aws ec2 describe-instances --filters Name=tag:Name,Values=*${1}* --query 'Reservations[*].Instances[*].PrivateIpAddress[]' | jq -r .[0])
+
+exit 0
