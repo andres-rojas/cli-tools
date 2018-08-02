@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+if [ "$(uname)" != "Darwin" ]; then
+  echo "This toggle is only useful for macOS clients!"
+  exit 1
+fi
+
+current=$(defaults read | grep AppleShowAllFiles | awk '{print $NF}' | tr -d ';')
+
+if [ "${current}" == "YES" ]; then
+  echo "Hiding hidden files!"
+  defaults write com.apple.finder AppleShowAllFiles NO;
+else
+  echo "Showing hidden files!"
+  defaults write com.apple.finder AppleShowAllFiles YES;
+fi
+
+killall Finder /System/Library/CoreServices/Finder.app
+
+exit 0
