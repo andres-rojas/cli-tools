@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+
+function show_help() {
+  name=$(basename ${0})
+  cat <<EOF
+Usage:
+  ${name} [check]  Displays whether databag encryption is enabled
+  ${name} toggle   Toggles automatic databag encryption
+  ${name} -h | -?
+
+Options:
+  -h, -?  Show this help message
+EOF
+  exit 0
+}
+
+# Reset getopts for the shell
+OPTIND=1
+
+# Options parsing
+while getopts "h?" opt; do
+  case "${opt}" in
+    h|\?)
+      show_help
+      exit 0
+      ;;
+  esac
+done
+
+knife_config="${HOME}/.chef/knife.rb"
+
+if [ ! -f "${knife_config}" ]; then
+  echo "${knife_config} not found!"
+  exit 1
+fi
+
+base_prefix="^[[:space:]]*"
+disabled_prefix="${base_prefix}#[[:space:]]*"
+
+edbs_enabled="${base_prefix}encrypted_data_bag_secret"
+edbs_disabled="${disabled_prefix}encrypted_data_bag_secret"
+ksf_enabled="${base_prefix}knife\[:secret_file]"
+ksf_disabled="${disabled_prefix}knife\[:secret_file]"
+
+function check_encryption() {
+  if grep -q "${edbs_disabled}" "${knife_config}"; then
+    if grep -q "${ksf_disabled}" "${knife_config}"; then
+      echo "Encryption disabled!"
+    else
+      echo "Encryption mismatch!"
+    fi
+  elif grep -q "${edbs_enabled}" "${knife_config}"; then
+    if grep -q "${ksf_enabled}" "${knife_config}"; then
+      echo "Encryption enabled!"
+    else
+      echo "Encryption mismatch!"
+    fi
+  else
+    echo "Encryption state unknown!"
+  fi
+}
+
+function toggle_encryption() {
+  state=$(check_encryption | awk '{print $2}' | tr -d '!$')
+
+  if [ "${state}" == "disabled" ]; then
+    sed -i '' "s/${edbs_disabled}/encrypted_data_bag_secret/" "${knife_config}"
+    sed -i '' "s/${ksf_disabled}/knife\[:secret_file]/" "${knife_config}"
+    check_encryption
+  elif [ "${state}" == "enabled" ]; then
+    sed -i '' "s/${edbs_enabled}/# encrypted_data_bag_secret/" "${knife_config}"
+    sed -i '' "s/${ksf_enabled}/# knife\[:secret_file]/" "${knife_config}"
+    check_encryption
+  else
+    echo >&2 "Unable to toggle! [$(check_encryption)]"
+    exit 1
+  fi
+}
+
+case "${1}" in
+  toggle)
+    toggle_encryption
+    exit 0
+    ;;
+  check|"")
+    check_encryption
+    exit 0
+    ;;
+  *)
+    echo >&2 "Unknown command: ${1}"
+    exit 1
+    ;;
+esac
