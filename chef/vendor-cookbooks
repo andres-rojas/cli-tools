@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+
+function show_help() {
+  name=$(basename ${0})
+  cat <<EOF
+Usage:
+  ${name} [-b DATA_BAGS_PATH] [-d DESTINATION] COOKBOOK
+  ${name} -h | -?
+
+Options:
+  -h, -?  Show this help message
+EOF
+  exit 0
+}
+
+# Reset getopts for the shell
+OPTIND=1
+data_bags=""
+destination=""
+
+while getopts ":hb:d:" opt; do
+  case "${opt}" in
+    h|\?)
+      show_help
+      exit 0
+      ;;
+    b)
+      data_bags="${OPTARG}"
+      ;;
+    d)
+      destination="${OPTARG}"
+      ;;
+  esac
+done
+shift $((OPTIND-1))
+
+if [ "$#" -lt 1 ]; then
+  show_help
+  exit 0
+fi
+
+cookbook=$(basename ${1})
+cookbook_path="${1}"
+cwd="${PWD}"
+
+echo "Vendoring cookbooks..."
+cd "${cookbook_path}"
+tmpdir="/tmp/vendor-cookbook-$(uuidgen | tr -d '-')"
+berks vendor "${tmpdir}" > /dev/null
+
+cd "${tmpdir}"
+echo "Creating directory structure..."
+rm Berksfile.lock
+mkdir cookbooks
+mv * cookbooks 2>/dev/null
+
+if [ -n "${data_bags}" ]; then
+  echo "Adding data bags..."
+  cp -r "${PWD}/${data_bags}" .
+fi
+
+echo "Compressing into a tarball..."
+tar czf "${destination:=${PWD}/${cookbook}.tgz}" .
+
+cd "${cwd}"
+rm -rf "${tmpdir}"
+
+echo
+echo "Tarball at ${destination}"
+
+exit 0
