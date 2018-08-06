@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+
+function show_help() {
+  name=$(basename ${0})
+  cat <<EOF
+${name} will check which ciphers are accepted by the given HOST.
+
+Usage:
+  ${name} [-d DELAY] [-v] HOST
+  ${name} -h | -?
+
+Options:
+  -d      Number of seconds delay between each cipher check
+  -v      Verbose output
+  -h, -?  Show this help message
+EOF
+  exit 0
+}
+
+# Options parsing
+OPTIND=1
+verbose="false"
+delay=1
+
+while getopts ":hvd:" opt; do
+  case "${opt}" in
+    h|\?)
+      show_help
+      exit 0
+      ;;
+    v)
+      verbose="true"
+      ;;
+    d)
+      delay="${OPTARG}"
+      ;;
+  esac
+done
+shift $((OPTIND-1))
+
+command -v "openssl" >/dev/null 2>&1 || {
+  echo >&2 "openssl is required to use this command!"
+  exit 1
+}
+
+if [ "$#" -lt 1 ]; then
+  show_help
+  exit 1
+fi
+
+# OpenSSL requires an explicit port number
+host="${1}:443"
+ciphers=($(openssl ciphers 'ALL:eNULL' | sed -e 's/:/ /g'))
+
+if [ "${verbose}" == "true" ]; then
+  echo "Obtaining cipher list from $(openssl version)"
+  echo -e "\t${#ciphers[@]} ciphers found!"
+fi
+
+for cipher in "${ciphers[@]}"; do
+  if [ "${verbose}" == "true" ]; then
+    echo
+  fi
+  echo -n "${cipher} "
+
+  result=$(echo -n | openssl s_client -cipher "${cipher}" -connect "${host}" 2>&1)
+  if [[ "${result}" =~ "Cipher is ${cipher}" || "${result}" =~ "Cipher    :" ]]; then
+    echo -e "\033[92m(✔)\033[39m"
+  else
+    if [[ "${result}" =~ ":error:" ]]; then
+      echo -e "\033[91m(✘)\033[39m"
+      if [ "${verbose}" == "true" ]; then
+        echo "${result}" | cut -d':' -f6
+      fi
+    else
+      echo -e "\033[93m(⚠  Unknown response)\033[39m"
+      if [ "${verbose}" == "true" ]; then
+        echo "${result}"
+      fi
+    fi
+  fi
+  sleep "${delay}"
+done
+
+exit 0
