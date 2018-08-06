@@ -4,8 +4,9 @@ function show_help() {
   name=$(basename ${0})
   cat <<EOF
 Usage:
-  ${name} [check]  Displays whether databag encryption is enabled
-  ${name} toggle   Toggles automatic databag encryption
+  ${name} [check]             Displays whether databag encryption is enabled
+  ${name} toggle              Toggles automatic databag encryption
+  ${name} audit [bag] [item]  Displays whether (the given) data bag(s) are encrypted
   ${name} -h | -?
 
 Options:
@@ -77,6 +78,41 @@ function toggle_encryption() {
   fi
 }
 
+function check_knife() {
+  command -v "knife" >/dev/null 2>&1 || {
+    echo >&2 "knife is required to use this command!"
+    exit 1
+  }
+}
+
+function audit_encryption() {
+  initial_state=$(check_encryption | awk '{print $2}' | tr -d '!$')
+
+  if [ "${initial_state}" != "disabled" ]; then
+    toggle_encryption
+    echo
+  fi
+
+  item="${2}"
+
+  for bag in ${1:-$(knife data bag list 2>/dev/null)}; do
+    for item in ${2:-$(knife data bag show "${bag}" 2>/dev/null)}; do
+      echo -n "Checking ${bag}/${item}... "
+
+      if knife data bag show "${bag}" "${item}" 2>/dev/null | grep -q encrypted_data; then
+        echo -e "\033[1;32mEncrypted!\033[0;39m"
+      else
+        echo -e "\033[1;31mNOT encrypted!\033[0;39m"
+      fi
+    done
+    echo
+  done
+
+  if [ "${initial_state}" != "disabled" ]; then
+    toggle_encryption
+  fi
+}
+
 case "${1}" in
   toggle)
     toggle_encryption
@@ -84,6 +120,11 @@ case "${1}" in
     ;;
   check|"")
     check_encryption
+    exit 0
+    ;;
+  audit)
+    check_knife
+    audit_encryption "${2}" "${3}"
     exit 0
     ;;
   *)
