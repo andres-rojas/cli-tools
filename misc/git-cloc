@@ -37,7 +37,7 @@ total=()
 for repo in "$@"; do
   echo
   if cd "${repo}"; then
-    echo "${repo}:"
+    echo "${PWD}:"
     current=$(git ls-files | sed "s|^|$PWD/|g")
     total=("${total[@]}" "${current[@]}")
     echo "${current}" | xargs cloc
