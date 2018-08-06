@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+
+function show_help() {
+  name=$(basename ${0})
+  cat <<EOF
+Usage:
+  ${name} repo_path...
+  ${name} -h | -?
+
+Options:
+  -h, -?  Show this help message
+}
+EOF
+  exit 0
+}
+
+# Reset getopts for the shell
+OPTIND=1
+
+# Options parsing
+while getopts "h?" opt; do
+  case "$opt" in
+    h|\?)
+      show_help
+      exit 0
+      ;;
+  esac
+done
+
+command -v "cloc" >/dev/null 2>&1 || {
+  echo >&2 "cloc is required to use this command!"
+  exit 1
+}
+
+total=()
+
+for repo in "$@"; do
+  echo
+  if cd "${repo}"; then
+    echo "${repo}:"
+    current=$(git ls-files | sed "s|^|$PWD/|g")
+    total=("${total[@]}" "${current[@]}")
+    echo "${current}" | xargs cloc
+  else
+    echo "ERROR: ${repo} not found!"
+    exit 1
+  fi
+done
+
+if [ "${#total[@]}" -gt 1 ]; then
+  echo -e "\nTotal:"
+  echo "${total}" | xargs cloc
+fi
+
+exit 0
