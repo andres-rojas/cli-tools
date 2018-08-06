@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+function show_help() {
+  name=$(basename ${0})
+  cat <<EOF
+${name} will knock on port 22 of the given host
+and then SSH to the host once successful
+
+Usage:
+  ${name} HOST
+  ${name} -h | -?
+
+Options:
+  -h, -?  Show this help message
+EOF
+  exit 0
+}
+
+# Options parsing
+OPTIND=1
+while getopts ":h" opt; do
+  case "${opt}" in
+    h|\?)
+      show_help
+      exit 0
+      ;;
+  esac
+done
+
+command -v "nc" >/dev/null 2>&1 || {
+  echo >&2 "nc is required to use this command!"
+  exit 1
+}
+
+echo -n "Knocking on ${1}..."
+
+until nc -vzw 2 "${1}" 22 2>/dev/null; do
+  sleep 2
+  echo -n .
+done
+
+echo -e " \033[1;32mAnswered!\033[0;39m"
+
+ssh "${1}"
+
+exit 0
