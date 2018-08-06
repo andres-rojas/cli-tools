@@ -7,27 +7,32 @@ ${name} will search the "Name" tag of your EC2 instances for the given QUERY
 and will ssh to the private IP of the first instance it finds.
 
 Usage:
-  ${name} QUERY
+  ${name} [-a] QUERY
   ${name} -h | -?
 
 Options:
+  -a      Sequentially SSH to all instances found in query
   -h, -?  Show this help message
 EOF
   exit 0
 }
 
-# Reset getopts for the shell
-OPTIND=1
-
 # Options parsing
-while getopts "h?" opt; do
+OPTIND=1
+result_index=0
+
+while getopts ":ah" opt; do
   case "${opt}" in
     h|\?)
       show_help
       exit 0
       ;;
+    a)
+      result_index=""
+      ;;
   esac
 done
+shift $((OPTIND-1))
 
 function require() {
   command -v "${1}" >/dev/null 2>&1 || {
@@ -40,6 +45,8 @@ function require() {
 require "aws" "AWS CLI" "https://docs.aws.amazon.com/cli/latest/userguide/installing.html"
 require "jq" "jq" "https://stedolan.github.io/jq/download/"
 
-ssh $(aws ec2 describe-instances --filters Name=tag:Name,Values=*${1}* --query 'Reservations[*].Instances[*].PrivateIpAddress[]' | jq -r .[0])
+for ip in $(aws ec2 describe-instances --filters Name=tag:Name,Values=*${1}* --query 'Reservations[*].Instances[*].PrivateIpAddress[]' | jq -r .[${result_index}]); do
+  ssh "${ip}"
+done
 
 exit 0
