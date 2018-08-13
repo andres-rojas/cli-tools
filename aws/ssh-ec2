@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 
-function show_help() {
-  name=$(basename ${0})
+basename() {
+  : "${1%/}"
+  printf '%s\n' "${_##*/}"
+}
+
+show_help() {
+  name=$(basename "${0}")
   cat <<EOF
 ${name} will search the "Name" tag of your EC2 instances for the given QUERY
 and will ssh to the private IP of the first instance it finds.
@@ -17,34 +22,41 @@ EOF
   exit 0
 }
 
-# Options parsing
-OPTIND=1
+[[ $# -eq 0 ]] && show_help
+
 result_index=0
 
-while getopts ":ah" opt; do
-  case "${opt}" in
-    h|\?)
+# Options parsing
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -\?|-h|--help)
       show_help
       exit 0
       ;;
-    a)
-      result_index=""
+    -a|--all)
+      result_index=''
+      shift
       ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
   esac
 done
-shift $((OPTIND-1))
+set -- "${POSITIONAL[@]}"
 
-function require() {
+require() {
   command -v "${1}" >/dev/null 2>&1 || {
-    echo >&2 "The ${2} tool is required to use this script!"
-    echo -e >&2 "\tSee: ${3}"
+    printf 'The %s tool is required to use this script!' "${2}" >&2
+    printf '\tSee: %s' "${3}" >&2
     exit 1
   }
 }
 
-require "aws" "AWS CLI" "https://docs.aws.amazon.com/cli/latest/userguide/installing.html"
-require "jq" "jq" "https://stedolan.github.io/jq/download/"
+require 'aws' 'AWS CLI' 'https://docs.aws.amazon.com/cli/latest/userguide/installing.html'
+require 'jq' 'jq' 'https://stedolan.github.io/jq/download/'
 
+# shellcheck disable=SC2086
 for ip in $(aws ec2 describe-instances --filters Name=tag:Name,Values=*${1}* --query 'Reservations[*].Instances[*].PrivateIpAddress[]' | jq -r .[${result_index}]); do
   ssh "${ip}"
 done
