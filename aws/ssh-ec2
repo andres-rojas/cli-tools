@@ -12,18 +12,19 @@ ${name} will search the "Name" tag of your EC2 instances for the given QUERY
 and will ssh to the private IP of the first instance it finds.
 
 Usage:
-  ${name} [-a] QUERY
-  ${name} -h | -?
+  ${name} [-a | --all] QUERY
+  ${name} -h | --help | -?
 
 Options:
-  -a, -all  Sequentially SSH to all instances found in query
-  -h, -?    Show this help message
+  -a, --all       Sequentially SSH to all instances found in query
+  -h, --help, -?  Show this help message
 EOF
   exit 0
 }
 
 [[ $# -eq 0 ]] && show_help
 
+# Option defaults
 result_index=0
 
 # Options parsing
