@@ -16,8 +16,8 @@ Usage:
   ${name} -h | -?
 
 Options:
-  -a      Sequentially SSH to all instances found in query
-  -h, -?  Show this help message
+  -a, -all  Sequentially SSH to all instances found in query
+  -h, -?    Show this help message
 EOF
   exit 0
 }
