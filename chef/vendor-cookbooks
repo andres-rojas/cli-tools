@@ -1,71 +1,102 @@
 #!/usr/bin/env bash
 
-function show_help() {
-  name=$(basename ${0})
+basename() {
+  : "${1%/}"
+  printf '%s\n' "${_##*/}"
+}
+
+show_help() {
+  name=$(basename "${0}")
   cat <<EOF
+${name} packages Berkshelf-vendorized Chef cookbooks into
+a standardized chef-repo tarball
+
 Usage:
-  ${name} [-b DATA_BAGS_PATH] [-d DESTINATION] COOKBOOK
-  ${name} -h | -?
+  ${name} [options] COOKBOOK
+  ${name} -h | --help | -?
 
 Options:
-  -h, -?  Show this help message
+  -b PATH, --data-bags PATH    Path of data bags to include in chef-repo
+  -d PATH, --destination PATH  Destination path for the tarball
+  -h, --help, -?               Show this help message
 EOF
   exit 0
 }
 
-# Reset getopts for the shell
-OPTIND=1
-data_bags=""
-destination=""
+# Option defaults
+data_bags=''
+destination=''
 
-while getopts ":hb:d:" opt; do
-  case "${opt}" in
-    h|\?)
+# Options parsing
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -\?|-h|--help)
       show_help
-      exit 0
       ;;
-    b)
-      data_bags="${OPTARG}"
+    -b|--data-bags)
+      data_bags="$1"
+      shift
       ;;
-    d)
-      destination="${OPTARG}"
+    -d|--destination)
+      destination="$1"
+      shift
       ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
   esac
 done
-shift $((OPTIND-1))
+set -- "${POSITIONAL[@]}"
 
-if [ "$#" -lt 1 ]; then
-  show_help
-  exit 0
-fi
+[[ $# -eq 0 ]] && show_help
 
 cookbook=$(basename ${1})
 cookbook_path="${1}"
 cwd="${PWD}"
 
-echo "Vendoring cookbooks..."
+uuid() {
+  c='89ab'
+  for ((i=0; i < 16; ++i)); do
+    b="$((RANDOM % 256))"
+    case "$i" in
+      6)
+        printf '4%x' "$((b % 16))"
+        ;;
+      8)
+        printf '%c%x' "${c:$RANDOM % ${#c}:1}" "$((b % 16))"
+        ;;
+      3|5|7|9)
+        printf '%02x-' "$b"
+        ;;
+      *)
+        printf '%02x' "$b"
+    esac
+  done
+}
+
+printf 'Vendoring cookbooks...\n'
 cd "${cookbook_path}"
-tmpdir="/tmp/vendor-cookbook-$(uuidgen | tr -d '-')"
+tmpdir="/tmp/vendor-cookbook-$(strip_all "$(uuid)" "-")"
 berks vendor "${tmpdir}" > /dev/null
 
 cd "${tmpdir}"
-echo "Creating directory structure..."
+printf 'Creating directory structure...\n'
 rm Berksfile.lock
 mkdir cookbooks
 mv * cookbooks 2>/dev/null
 
 if [ -n "${data_bags}" ]; then
-  echo "Adding data bags..."
+  printf 'Adding data bags...\n'
   cp -r "${PWD}/${data_bags}" .
 fi
 
-echo "Compressing into a tarball..."
+printf 'Compressing into a tarball...\n'
 tar czf "${destination:=${PWD}/${cookbook}.tgz}" .
 
 cd "${cwd}"
 rm -rf "${tmpdir}"
 
-echo
-echo "Tarball at ${destination}"
+printf '\nTarball at %s\n' "${destination}"
 
 exit 0
