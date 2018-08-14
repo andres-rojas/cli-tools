@@ -1,55 +1,75 @@
 #!/usr/bin/env bash
 
-function show_help() {
-  name=$(basename ${0})
+show_help() {
+  name=$(basename "${0}")
   cat <<EOF
+${name} parses the given Git repository with cloc
+
 Usage:
-  ${name} repo_path...
-  ${name} -h | -?
+  ${name} REPO_PATH...
+  ${name} -h | --help | -?
 
 Options:
-  -h, -?  Show this help message
-}
+  -h, --help, -?  Show this help message
 EOF
   exit 0
 }
 
-# Reset getopts for the shell
-OPTIND=1
-
 # Options parsing
-while getopts "h?" opt; do
-  case "$opt" in
-    h|\?)
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -\?|-h|--help)
       show_help
-      exit 0
       ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
   esac
 done
+set -- "${POSITIONAL[@]}"
 
-command -v "cloc" >/dev/null 2>&1 || {
-  echo >&2 "cloc is required to use this command!"
+[[ $# -eq 0 ]] && show_help
+
+require() {
+  name="${2:-${1}}"
+  command -v "${1}" >/dev/null 2>&1 || {
+    printf 'The %s tool is required to use this script!\n' "${name}" >&2
+    [[ -z "${3}" ]] || printf '\tSee: %s\n' "${3}" >&2
+    exit 1
+  }
+}
+
+require 'cloc' 'cloc' 'https://github.com/AlDanial/cloc/'
+require 'git' 'git' 'https://git-scm.com'
+
+cd_error() {
+  # shellcheck disable=SC1117
+  printf "Can't access path: %s\n" "${1}"
   exit 1
 }
 
 total=()
-
 for repo in "$@"; do
-  echo
-  if cd "${repo}"; then
-    echo "${PWD}:"
-    current=$(git ls-files | sed "s|^|$PWD/|g")
-    total=("${total[@]}" "${current[@]}")
-    echo "${current}" | xargs cloc
-  else
-    echo "ERROR: ${repo} not found!"
-    exit 1
-  fi
+  printf '\n'
+
+  cd "${repo}" || cd_error "${repo}"
+  printf '%s:\n' "${PWD}"
+
+  i=0
+  for f in $(git ls-files); do
+    current[${i}]="${PWD}/${f}"
+    ((i++))
+  done
+
+  total=("${total[@]}" "${current[@]}")
+
+  printf '%s\n' "${current[@]}" | xargs cloc
 done
 
-if [ "${#total[@]}" -gt 1 ]; then
-  echo -e "\nTotal:"
-  echo "${total}" | xargs cloc
+if [ $# -gt 1 ]; then
+  printf '\nTotal:\n'
+  printf '%s\n' "${total[@]}" | xargs cloc
 fi
 
 exit 0
