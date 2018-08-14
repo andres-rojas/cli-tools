@@ -1,62 +1,100 @@
 #!/usr/bin/env bash
 
-if [ "$(uname)" != "Darwin" ]; then
-  echo "This toggle is only useful for macOS clients!"
+if [ "$(uname)" != 'Darwin' ]; then
+  printf 'This toggle is only useful for macOS clients!\n' >&2
   exit 1
 fi
 
-uuid="$(uuidgen | tr -d '-')"
-tempFile="/tmp/${uuid}.img"
+require() {
+  name="${2:-${1}}"
+  command -v "${1}" >/dev/null 2>&1 || {
+    printf 'The %s tool is required to use this script!\n' "${name}" >&2
+    [[ -z "${3}" ]] || printf '\tSee: %s\n' "${3}" >&2
+    exit 1
+  }
+}
 
-printf "Path to your bootable ISO? "
-read sourceISO
+require 'dd'
+require 'diskutil'
+require 'file'
+require 'hdiutil'
+
+uuid() {
+  c='89ab'
+  for ((i=0; i < 16; ++i)); do
+    b="$((RANDOM % 256))"
+    case "$i" in
+      6)
+        printf '4%x' "$((b % 16))"
+        ;;
+      8)
+        printf '%c%x' "${c:$RANDOM % ${#c}:1}" "$((b % 16))"
+        ;;
+      3|5|7|9)
+        printf '%02x-' "$b"
+        ;;
+      *)
+        printf '%02x' "$b"
+    esac
+  done
+}
+
+strip_all() {
+  printf '%s' "${1//$2}"
+}
+
+id="$(strip_all "$(uuid)" '-')"
+tempFile="/tmp/${id}.img"
+
+printf 'Path to your bootable ISO? '
+read -r sourceISO
 
 if [ -e "${sourceISO}" ]; then
-  printf "\n${sourceISO} exists!\n"
+  printf '\n %s exists!\n' "${sourceISO}"
 
-  printf "\nConverting ISO to IMG...\n"
+  printf '\nConverting ISO to IMG...\n'
   hdiutil convert -format UDRW -o "${tempFile}" "${sourceISO}"
 
   if [ -e "${tempFile}.dmg" ]; then
-    printf "\nCorrecting automatic addition of .dmg to IMG filename...\n"
+    printf '\nCorrecting automatic addition of .dmg to IMG filename...\n'
     mv "${tempFile}.dmg" "${tempFile}"
   fi
 
   OIFS="${IFS}"
   IFS=','
-  devices=$(diskutil list | awk '/   0:/ { print $5" \t\t"$3" "$4" \t"$2"," }')
-  printf "\nDEVICE \t\tSIZE\t\tVOLUME NAME\n"
-  echo "${devices}"
+  devices=$(diskutil list | awk '/   0:/ { print $5" \t\t"$3" "$4" \t"$2 }')
+  printf '\nDEVICE \t\tSIZE\t\tVOLUME NAME\n'
+  printf '%s\n' "${devices}"
   IFS="${OIFS}"
 
-  printf "\nTarget device? "
-  read target
+  printf '\nTarget device? '
+  read -r target
 
-  if [ `file /dev/${target} | awk '{print $2 }'` == "block" ]; then
-    printf "\n/dev/${target} is valid!\n"
-    echo -e "\033[1;31mANY DATA ON ${target} WILL BE OVERWRITTEN!\033[0;39m"
-    read -p "Are you sure? " -n 1 -r
+  if [ "$(file /dev/"${target}" | awk '{print $2 }')" == 'block' ]; then
+    printf '\n/dev/%s is valid!\n' "${target}"
+    printf '\033[1;31mANY DATA ON %s WILL BE OVERWRITTEN!\033[0;39m\n' "${target}"
+    read -p 'Are you sure? ' -n 1 -r
     echo
 
     if [[ "${REPLY}" =~ ^[Yy]$ ]]; then
-      printf "\nUnmounting ${target}...\n"
+      printf '\nUnmounting %s...\n' "${target}"
       diskutil unmountDisk "/dev/${target}"
 
-      printf "\nWriting ${sourceISO} to ${target}... (may take a while)\n"
+      printf '\nWriting %s to %s... (may take a while)\n' "${sourceISO}" "${target}"
       sudo dd if="${tempFile}" of="/dev/r${target}" bs=1m
 
-      printf "\nDone! Ejecting ${target} device!\n"
+      printf '\nDone! Ejecting %s device!\n' "${target}"
       diskutil eject "/dev/${target}"
     fi
 
     rm "${tempFile}"
   else
-    echo >&2 "/dev/${target} does not appear to be a valid target!"
+    printf '/dev/%s does not appear to be a valid target!\n' "${target}" >&2
     rm "${tempFile}"
     exit 1
   fi
 else
-  echo >&2 "${sourceISO} does not exist!"
+  printf '%s does not exist!' "${sourceISO}" >&2
   exit 1
 fi
 
