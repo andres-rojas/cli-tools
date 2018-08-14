@@ -1,42 +1,61 @@
 #!/usr/bin/env sh
 
-function show_help() {
-  name=$(basename ${0})
+show_help() {
+  name=$(basename "${0}")
   cat <<EOF
+${name} generates a random password of the given length
+
 Usage:
-  ${name} [length]
-  ${name} -h | -?
+  ${name} [LENGTH]
+  ${name} -h | --help | -?
 
 Options:
-  -h, -?  Show this help message
+  -h, --help, -?  Show this help message
 EOF
   exit 0
 }
 
-# Reset getopts for the shell
-OPTIND=1
-
 # Options parsing
-while getopts "h?" opt; do
-  case "$opt" in
-    h|\?)
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -\?|-h|--help)
       show_help
-      exit 0
       ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
   esac
 done
+set -- "${POSITIONAL[@]}"
+
+require() {
+  name="${2:-${1}}"
+  command -v "${1}" >/dev/null 2>&1 || {
+    printf 'The %s tool is required to use this script!\n' "${name}" >&2
+    [[ -z "${3}" ]] || printf '\tSee: %s\n' "${3}" >&2
+    exit 1
+  }
+}
+
+require 'base64'
+require 'dd'
 
 length=${1:-32}
 
 # MacOS uses POSIX utils by default
-case "$(uname -s)" in
-  Darwin*)
-    pw=$(dd if=/dev/urandom bs=1 count=${length} 2>/dev/null | base64 -b 0 | rev | cut -b 2- | rev)
+case "${OSTYPE}" in
+  "darwin"*)
+    : 'break'
     ;;
   *)
-    pw=$(dd if=/dev/urandom bs=1 count=${length} 2>/dev/null | base64 -w 0 | rev | cut -b 2- | rev)
-    ;;
+    : 'wrap'
 esac
+base64_opt="$_"
 
-echo ${pw:0:${length}}
+pw="$(dd if=/dev/urandom bs=1 count="${length}" 2>/dev/null | base64 --${base64_opt}=0)"
+pw="${pw//=}"
+pw="${pw:0:${length}}"
+
+printf '%s\n' "${pw}"
 exit 0
