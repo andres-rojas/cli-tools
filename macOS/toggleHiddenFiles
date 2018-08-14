@@ -1,12 +1,23 @@
 #!/usr/bin/env bash
 
-if [ "$(uname)" != "Darwin" ]; then
-  echo "This toggle is only useful for macOS clients!"
+if [ "$(uname)" != 'Darwin' ]; then
+  printf 'This toggle is only useful for macOS clients!\n' >&2
   exit 1
 fi
 
-current=$(defaults read | grep AppleShowAllFiles | awk '{print $NF}' | tr -d ';')
+require() {
+  name="${2:-${1}}"
+  command -v "${1}" >/dev/null 2>&1 || {
+    printf 'The %s tool is required to use this script!\n' "${name}" >&2
+    [[ -z "${3}" ]] || printf '\tSee: %s\n' "${3}" >&2
+    exit 1
+  }
+}
 
+require 'defaults'
+require 'killall'
+
+current=$(defaults read com.apple.finder AppleShowAllFiles)
 if [ "${current}" == "YES" ]; then
   echo "Hiding hidden files!"
   defaults write com.apple.finder AppleShowAllFiles NO;
