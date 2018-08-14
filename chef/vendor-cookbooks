@@ -51,7 +51,7 @@ set -- "${POSITIONAL[@]}"
 
 [[ $# -eq 0 ]] && show_help
 
-cookbook=$(basename ${1})
+cookbook="$(basename "${1}")"
 cookbook_path="${1}"
 cwd="${PWD}"
 
@@ -75,16 +75,26 @@ uuid() {
   done
 }
 
+strip_all() {
+  printf '%s' "${1//$2}"
+}
+
+cd_error() {
+  # shellcheck disable=SC1117
+  printf "Can't access path: %s\n" "${1}"
+  exit 1
+}
+
 printf 'Vendoring cookbooks...\n'
-cd "${cookbook_path}"
+cd "${cookbook_path}" || cd_error "${cookbook_path}"
 tmpdir="/tmp/vendor-cookbook-$(strip_all "$(uuid)" "-")"
 berks vendor "${tmpdir}" > /dev/null
 
-cd "${tmpdir}"
+cd "${tmpdir}" || cd_error "${tmpdir}"
 printf 'Creating directory structure...\n'
 rm Berksfile.lock
 mkdir cookbooks
-mv * cookbooks 2>/dev/null
+mv ./* cookbooks 2>/dev/null
 
 if [ -n "${data_bags}" ]; then
   printf 'Adding data bags...\n'
@@ -94,7 +104,7 @@ fi
 printf 'Compressing into a tarball...\n'
 tar czf "${destination:=${PWD}/${cookbook}.tgz}" .
 
-cd "${cwd}"
+cd "${cwd}" || cd_error "${cwd}"
 rm -rf "${tmpdir}"
 
 printf '\nTarball at %s\n' "${destination}"
