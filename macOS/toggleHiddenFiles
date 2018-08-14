@@ -19,10 +19,10 @@ require 'killall'
 
 current=$(defaults read com.apple.finder AppleShowAllFiles)
 if [ "${current}" == "YES" ]; then
-  echo "Hiding hidden files!"
+  printf 'Hiding hidden files!\n'
   defaults write com.apple.finder AppleShowAllFiles NO;
 else
-  echo "Showing hidden files!"
+  printf 'Showing hidden files!\n'
   defaults write com.apple.finder AppleShowAllFiles YES;
 fi
 
