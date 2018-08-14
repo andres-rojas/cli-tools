@@ -139,7 +139,7 @@ case "${1}" in
     exit 0
     ;;
   *)
-    printf 'Unknown command: %s' "${1}" >&2
+    printf 'Unknown command: %s\n' "${1}" >&2
     exit 1
     ;;
 esac
