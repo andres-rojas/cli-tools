@@ -140,6 +140,8 @@ case "${1}" in
     ;;
   *)
     printf 'Unknown command: %s\n' "${1}" >&2
+    printf '\n'
+    show_help
     exit 1
     ;;
 esac
