@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+basename() {
+  : "${1%/}"
+  printf '%s\n' "${_##*/}"
+}
+
 show_help() {
   name=$(basename "${0}")
   cat <<EOF
@@ -33,7 +38,7 @@ set -- "${POSITIONAL[@]}"
 [[ $# -eq 0 ]] && show_help
 
 command -v openssl >/dev/null 2>&1 || {
-  printf 'openssl is required to use this command!' >&2
+  printf 'openssl is required to use this command!\n' >&2
   exit 1
 }
 
