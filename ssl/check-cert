@@ -1,40 +1,42 @@
 #!/usr/bin/env bash
 
-function show_help() {
-  name=$(basename ${0})
+show_help() {
+  name=$(basename "${0}")
   cat <<EOF
 ${name} will retrieve a server's SSL certificate and
-output the details via openssl to stdout.
+output the details via openssl to STDOUT.
 
 Usage:
   ${name} FQDN
-  ${name} -h | -?
+  ${name} -h | --help | -?
 
 Options:
-  -h, -?  Show this help message
+  -h, --help, -?  Show this help message
 EOF
   exit 0
 }
 
-# Reset getopts for the shell
-OPTIND=1
-
 # Options parsing
-while getopts "h?" opt; do
-  case "${opt}" in
-    h|\?)
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -\?|-h|--help)
       show_help
-      exit 0
       ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
   esac
 done
+set -- "${POSITIONAL[@]}"
 
-command -v "openssl" >/dev/null 2>&1 || {
-  echo >&2 "openssl is required to use this command!"
+[[ $# -eq 0 ]] && show_help
+
+command -v openssl >/dev/null 2>&1 || {
+  printf 'openssl is required to use this command!' >&2
   exit 1
 }
 
-fqdn="${1}"
-echo | openssl s_client -servername "${fqdn}" -connect "${fqdn}":443 2>/dev/null | openssl x509 -text
+echo | openssl s_client -servername "${1}" -connect "${1}":443 2>/dev/null | openssl x509 -text
 
 exit 0
