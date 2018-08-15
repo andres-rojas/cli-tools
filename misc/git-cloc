@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+basename() {
+  : "${1%/}"
+  printf '%s\n' "${_##*/}"
+}
+
 show_help() {
   name=$(basename "${0}")
   cat <<EOF
