@@ -45,8 +45,21 @@ require 'nc'
 require 'sleep'
 require 'ssh'
 
-printf 'Knocking on %s...' "${1}"
-until nc -vzw 2 "${1}" 22 2>/dev/null; do
+# Stop macOS from taking over BASH_REMATCH
+[[ "$(uname)" == 'Darwin' ]] && unset PROMPT_COMMAND
+
+regex() {
+  [[ $1 =~ $2 ]] && printf '%s\n' "${BASH_REMATCH[1]}"
+}
+
+if [[ $1 =~ @ ]]; then
+  host=$(regex "${1}" "^.*@(.*)$")
+else
+  host="${1}"
+fi
+
+printf 'Knocking on %s...' "${host}"
+until nc -vzw 2 "${host}" 22 2>/dev/null; do
   sleep 2
   printf '.'
 done
