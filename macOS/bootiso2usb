@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-if [ "$(uname)" != 'Darwin' ]; then
+if [[ ! ${OSTYPE} =~ ^darwin ]]; then
   printf 'This toggle is only useful for macOS clients!\n' >&2
   exit 1
 fi
