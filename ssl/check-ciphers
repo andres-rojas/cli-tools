@@ -70,8 +70,10 @@ log() {
 }
 
 host="${1}:443" # OpenSSL requires an explicit port number
-ciphers=($(openssl ciphers 'ALL:eNULL' | tr ':' ' '))
 
+# shellcheck disable=SC2207
+# `mapfile` or `read -a` would be nice, if they were available by default
+ciphers=($(openssl ciphers 'ALL:eNULL' | tr ':' ' '))
 log "Obtaining cipher list from $(openssl version)"
 log "${#ciphers[@]} ciphers found!"
 
@@ -80,6 +82,8 @@ for cipher in "${ciphers[@]}"; do
   printf '%s ' "${cipher}"
 
   result=$(echo -n | openssl s_client -cipher "${cipher}" -connect "${host}" 2>&1)
+
+  # shellcheck disable=SC2076
   if [[ "${result}" =~ "Cipher is ${cipher}" || "${result}" =~ "Cipher    :" ]]; then
     printf '\033[92m(✔)\033[39m\n'
   else
