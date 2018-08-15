@@ -1,82 +1,94 @@
 #!/usr/bin/env bash
 
-function show_help() {
-  name=$(basename ${0})
+basename() {
+  : "${1%/}"
+  printf '%s\n' "${_##*/}"
+}
+
+show_help() {
+  name=$(basename "${0}")
   cat <<EOF
 ${name} will check which ciphers are accepted by the given HOST.
 
 Usage:
-  ${name} [-d DELAY] [-v] HOST
-  ${name} -h | -?
+  ${name} [options] HOST
+  ${name} -h | --help | -?
 
 Options:
-  -d      Number of seconds delay between each cipher check
-  -v      Verbose output
-  -h, -?  Show this help message
+  -d SECONDS, --delay SECONDS  Number of seconds delay between each check
+  -v, --verbose                Verbose output
+  -h, --help, -?               Show this help message
 EOF
   exit 0
 }
 
-# Options parsing
-OPTIND=1
-verbose="false"
+# Option defaults
 delay=1
+verbose="false"
 
-while getopts ":hvd:" opt; do
-  case "${opt}" in
-    h|\?)
+# Options parsing
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -\?|-h|--help)
       show_help
-      exit 0
       ;;
-    v)
+    -d|--delay)
+      delay="${2}"
+      shift
+      shift
+      ;;
+    -v|--verbose)
       verbose="true"
+      shift
       ;;
-    d)
-      delay="${OPTARG}"
-      ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
   esac
 done
-shift $((OPTIND-1))
+set -- "${POSITIONAL[@]}"
 
-command -v "openssl" >/dev/null 2>&1 || {
-  echo >&2 "openssl is required to use this command!"
-  exit 1
+[[ $# -eq 0 ]] && show_help
+
+require() {
+  name="${2:-${1}}"
+  command -v "${1}" >/dev/null 2>&1 || {
+    printf 'The %s tool is required to use this script!\n' "${name}" >&2
+    [[ -z "${3}" ]] || printf '\tSee: %s\n' "${3}" >&2
+    exit 1
+  }
 }
 
-if [ "$#" -lt 1 ]; then
-  show_help
-  exit 1
-fi
+require 'cut'
+require 'openssl' 'openssl' 'https://openssl.org/'
+require 'sleep'
+require 'tr'
 
-# OpenSSL requires an explicit port number
-host="${1}:443"
-ciphers=($(openssl ciphers 'ALL:eNULL' | sed -e 's/:/ /g'))
+log() {
+  [[ "${verbose}" == "true" ]] && printf '%s\n' "${1}"
+}
 
-if [ "${verbose}" == "true" ]; then
-  echo "Obtaining cipher list from $(openssl version)"
-  echo -e "\t${#ciphers[@]} ciphers found!"
-fi
+host="${1}:443" # OpenSSL requires an explicit port number
+ciphers=($(openssl ciphers 'ALL:eNULL' | tr ':' ' '))
+
+log "Obtaining cipher list from $(openssl version)"
+log "${#ciphers[@]} ciphers found!"
 
 for cipher in "${ciphers[@]}"; do
-  if [ "${verbose}" == "true" ]; then
-    echo
-  fi
-  echo -n "${cipher} "
+  log
+  printf '%s ' "${cipher}"
 
   result=$(echo -n | openssl s_client -cipher "${cipher}" -connect "${host}" 2>&1)
   if [[ "${result}" =~ "Cipher is ${cipher}" || "${result}" =~ "Cipher    :" ]]; then
-    echo -e "\033[92m(✔)\033[39m"
+    printf '\033[92m(✔)\033[39m\n'
   else
     if [[ "${result}" =~ ":error:" ]]; then
-      echo -e "\033[91m(✘)\033[39m"
-      if [ "${verbose}" == "true" ]; then
-        echo "${result}" | cut -d':' -f6
-      fi
+      printf '\033[91m(✘)\033[39m\n'
+      log "$(printf '%s\n' "${result}" | cut -d':' -f6)"
     else
-      echo -e "\033[93m(⚠  Unknown response)\033[39m"
-      if [ "${verbose}" == "true" ]; then
-        echo "${result}"
-      fi
+      printf '\033[93m(⚠  Unknown response)\033[39m\n'
+      log "${result}"
     fi
   fi
   sleep "${delay}"
