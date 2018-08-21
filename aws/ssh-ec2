@@ -11,13 +11,17 @@ show_help() {
 ${name} will search the "Name" tag of your EC2 instances for the given QUERY
 and will ssh to the private IP of the first instance it finds.
 
+If the QUERY is prefixed with a REMOTE_USER@ then it will attempt to SSH in
+as that REMOTE_USER.
+
 Usage:
-  ${name} [-a | --all] QUERY
+  ${name} [options] [REMOTE_USER@]QUERY
   ${name} -h | --help | -?
 
 Options:
-  -a, --all       Sequentially SSH to all instances found in query
-  -h, --help, -?  Show this help message
+  -a, --all             Sequentially SSH to all instances found in query
+  -w, --when-available  Tries port knocking before SSHing in
+  -h, --help, -?        Show this help message
 EOF
   exit 0
 }
@@ -26,6 +30,7 @@ EOF
 
 # Option defaults
 result_index=0
+when_available='false'
 
 # Options parsing
 POSITIONAL=()
@@ -37,6 +42,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     -a|--all)
       result_index=''
+      shift
+      ;;
+    -w|--when-available)
+      when_available='true'
       shift
       ;;
     *)
@@ -57,10 +66,29 @@ require() {
 
 require 'aws' 'AWS CLI' 'https://docs.aws.amazon.com/cli/latest/userguide/installing.html'
 require 'jq' 'jq' 'https://stedolan.github.io/jq/download/'
+[[ "${when_available}" = "true" ]] && require 'sshwa' 'sshwa' 'https://github.com/andres-rojas/homebrew-keg/blob/master/sshwa.rb'
+
+# Stop macOS from taking over BASH_REMATCH
+[[ ${OSTYPE} =~ ^darwin ]] && unset PROMPT_COMMAND
+
+regex() {
+  [[ $1 =~ $2 ]] && printf '%s\n' "${BASH_REMATCH[1]}"
+}
+
+if [[ $1 =~ @ ]]; then
+  remote_user=$(regex "${1}" "^(.*)@.*$")
+  host=$(regex "${1}" "^.*@(.*)$")
+else
+  host="${1}"
+fi
 
 # shellcheck disable=SC2086
-for ip in $(aws ec2 describe-instances --filters Name=tag:Name,Values=*${1}* --query 'Reservations[*].Instances[*].PrivateIpAddress[]' | jq -r .[${result_index}]); do
-  ssh "${ip}"
+for ip in $(aws ec2 describe-instances --filters Name=tag:Name,Values=*${host}* --query 'Reservations[*].Instances[*].PrivateIpAddress[]' | jq -r .[${result_index}]); do
+  if [[ -n "${remote_user}" ]]; then
+    [[ "${when_available}" = "true" ]] && sshwa "${remote_user}@${ip}" || ssh "${remote_user}@${ip}"
+  else
+    [[ "${when_available}" = "true" ]] && sshwa "${ip}" || ssh "${ip}"
+  fi
 done
 
 exit 0
