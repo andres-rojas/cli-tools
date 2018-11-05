@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+if [[ ! ${OSTYPE} =~ ^darwin ]]; then
+  printf 'This toggle is only useful for macOS clients!\n' >&2
+  exit 1
+fi
+
+_INJECTION_POINT="/Applications/Slack.app/Contents/Resources/app.asar.unpacked/src/static/ssb-interop.js"
+_INJECTION_HEADER="// Start Slack Dark Mode Injection"
+_INJECTION_FOOTER="// End Slack Dark Mode Injection"
+_INJECTION_BACKUP="${_INJECTION_POINT}.bak"
+
+if [[ ! -f "${_INJECTION_POINT}" ]]; then
+  printf 'Injection point for Dark Slack CSS not found!'
+  exit 1
+fi
+
+if grep --quiet "${_INJECTION_HEADER}" "${_INJECTION_POINT}"; then
+  if [[ -f "${_INJECTION_BACKUP}" ]]; then
+    mv "${_INJECTION_BACKUP}" "${_INJECTION_POINT}" || exit $?
+    printf 'Reverted Dark Slack!\n'
+  else
+    cat << EOF
+No backup found! Cannot automatically revert!
+
+Manual Process:
+  - Open: ${_INJECTION_POINT}
+  - Find and delete the following block:
+
+      ${_INJECTION_HEADER}
+      [code block]
+      ${_INJECTION_FOOTER}
+EOF
+  fi
+else
+  cp "${_INJECTION_POINT}" "${_INJECTION_BACKUP}" || exit $?
+  cat << EOF >> "${_INJECTION_POINT}"
+
+${_INJECTION_HEADER}
+document.addEventListener('DOMContentLoaded', function() {
+  \$.ajax({
+    url: 'https://cdn.rawgit.com/laCour/slack-night-mode/master/css/raw/black.css',
+    success: function(css) {
+      let overrides = \`
+        code { background-color: #535353; color: #85c5ff; } /* Change color: to whatever font color you want */
+        .c-mrkdwn__pre, .c-mrkdwn__quote { background: #535353 !important; background-color: #535353 !important; }
+        a, a:link, a:visited { color: #85c5ff; }
+        a:hover, a:active: a:focus { color: #a3d2ff; }
+        .c-mrkdwn__user_group--link, .c-mrkdwn__broadcast--mention, .c-mrkdwn__highlight, .c-mrkdwn__mention, .c-mrkdwn__user_group--mention { background: #363636; border: 1px solid #545454; color: #6ee8df; }
+        .c-mrkdwn__user_group--link:hover, .c-mrkdwn__broadcast--mention:hover, .c-mrkdwn__mention:hover, .c-mrkdwn__user_group--mention:hover { background: #424242; color: #6ee8df; }
+      \`
+      \$("<style></style>").appendTo('head').html(css + overrides);
+    }
+  });
+});
+${_INJECTION_FOOTER}
+EOF
+  printf 'Enabled Dark Slack!\n'
+fi
+
+exit 0
