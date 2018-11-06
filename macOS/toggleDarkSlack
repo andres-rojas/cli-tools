@@ -11,7 +11,13 @@ _INJECTION_FOOTER="// End Slack Dark Mode Injection"
 _INJECTION_BACKUP="${_INJECTION_POINT}.bak"
 
 if [[ ! -f "${_INJECTION_POINT}" ]]; then
-  printf 'Injection point for Dark Slack CSS not found!'
+  printf 'Injection point for Dark Slack CSS not found!\n'
+  exit 1
+fi
+
+if [[ ! -w "${_INJECTION_POINT}" ]]; then
+  printf 'This user is not allowed to make changes to Slack!\n'
+  printf '(You might want to try using sudo)'
   exit 1
 fi
 
