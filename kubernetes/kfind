@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+basename() {
+  : "${1%/}"
+  printf '%s\n' "${_##*/}"
+}
+
+show_help() {
+  name=$(basename "${0}")
+  cat <<EOF
+${name} finds all resources deployed to a Kubernetes cluster that match the given QUERY
+
+Usage:
+  ${name} QUERY
+  ${name} -h | --help | -?
+
+Options:
+  -h, --help, -?  Show this help message
+EOF
+  exit 0
+}
+
+# Options parsing
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -\?|-h|--help)
+      show_help
+      ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
+  esac
+done
+set -- "${POSITIONAL[@]}"
+
+[[ $# -eq 0 ]] && show_help
+
+require() {
+  name="${2:-${1}}"
+  command -v "${1}" >/dev/null 2>&1 || {
+    printf 'The %s tool is required to use this script!\n' "${name}" >&2
+    [[ -z "${3}" ]] || printf '\tSee: %s\n' "${3}" >&2
+    exit 1
+  }
+}
+
+require 'kubectl' 'kubectl' 'https://kubernetes.io/docs/tasks/tools/install-kubectl/'
+
+kubectl get all --all-namespaces=true 2>&1 | grep ${1} | awk '{print $2}'
+
+exit 0
