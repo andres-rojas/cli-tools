@@ -1,0 +1,67 @@
+#!/usr/bin/env sh
+
+basename() {
+  : "${1%/}"
+  printf '%s\n' "${_##*/}"
+}
+
+show_help() {
+  name=$(basename "${0}")
+  cat <<EOF
+${name} runs a curl command from within a Kubernetes cluster.
+Will also try to pretty-print JSON responses.
+
+Usage:
+  ${name} [--raw | -r] URI
+  ${name} -h | --help | -?
+
+Options:
+  -r, --raw       Raw output; Do not prettify
+  -h, --help, -?  Show this help message
+EOF
+  exit 0
+}
+
+# Options parsing
+RAW="false"
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -\?|-h|--help)
+      show_help
+      ;;
+    -r|--raw)
+      RAW="true"
+      shift
+      ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
+  esac
+done
+set -- "${POSITIONAL[@]}"
+
+[[ $# -eq 0 ]] && show_help
+
+require() {
+  name="${2:-${1}}"
+  command -v "${1}" >/dev/null 2>&1 || {
+    printf 'The %s tool is required to use this script!\n' "${name}" >&2
+    [[ -z "${3}" ]] || printf '\tSee: %s\n' "${3}" >&2
+    exit 1
+  }
+}
+
+require 'kubectl' 'kubectl' 'https://kubernetes.io/docs/tasks/tools/install-kubectl/'
+
+RESPONSE="$(kubectl run curl --stdin --tty --rm --image=appropriate/curl -- ${1} 2>/dev/null)"
+RESPONSE="${RESPONSE%%Session ended*}"
+
+# Unless raw output is enabled and if `jq` is available and is able to parse as JSON, then pretty-print
+if [[ "${RAW}" = "false" ]] && command -v "jq" >/dev/null 2>&1 && echo "${RESPONSE}" | jq empty 2>/dev/null; then
+  echo "${RESPONSE}" | jq .
+else
+  echo "${RESPONSE}"
+fi
+
+exit 0
