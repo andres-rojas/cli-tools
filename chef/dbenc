@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+#region helper functions
 basename() {
   : "${1%/}"
   printf '%s\n' "${_##*/}"
@@ -21,7 +22,9 @@ Options:
 EOF
   exit 0
 }
+#endregion helper functions
 
+#region options parsing
 # Options parsing
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
@@ -36,7 +39,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 set -- "${POSITIONAL[@]}"
+#endregion options parsing
 
+#region knife check
 knife_config="${HOME}/.chef/knife.rb"
 
 if [ ! -f "${knife_config}" ]; then
@@ -44,6 +49,15 @@ if [ ! -f "${knife_config}" ]; then
   exit 1
 fi
 
+check_knife() {
+  command -v "knife" >/dev/null 2>&1 || {
+    printf 'knife is required to use this command!' >&2
+    exit 1
+  }
+}
+#endregion knife check
+
+#region encryption toggle templates
 base_prefix="^[[:space:]]*"
 disabled_prefix="${base_prefix}#[[:space:]]*"
 
@@ -51,7 +65,9 @@ edbs_enabled="${base_prefix}encrypted_data_bag_secret"
 edbs_disabled="${disabled_prefix}encrypted_data_bag_secret"
 ksf_enabled="${base_prefix}knife\[:secret_file]"
 ksf_disabled="${disabled_prefix}knife\[:secret_file]"
+#endregion encryption toggle templates
 
+#region command functions
 check_encryption() {
   if grep -q "${edbs_disabled}" "${knife_config}"; then
     if grep -q "${ksf_disabled}" "${knife_config}"; then
@@ -87,14 +103,6 @@ toggle_encryption() {
   fi
 }
 
-check_knife() {
-  command -v "knife" >/dev/null 2>&1 || {
-    printf 'knife is required to use this command!' >&2
-    exit 1
-  }
-
-}
-
 audit_encryption() {
   initial_state=$(check_encryption | awk '{print $2}' | tr -d '!$')
 
@@ -122,7 +130,9 @@ audit_encryption() {
     toggle_encryption
   fi
 }
+#endregion command functions
 
+#region main
 case "${1}" in
   toggle)
     toggle_encryption
@@ -144,3 +154,4 @@ case "${1}" in
     exit 1
     ;;
 esac
+#endregion main
