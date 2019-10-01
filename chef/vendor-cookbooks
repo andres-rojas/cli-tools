@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 
+#region helper functions
 basename() {
   : "${1%/}"
   printf '%s\n' "${_##*/}"
+}
+
+cd_error() {
+  # shellcheck disable=SC1117
+  printf "Can't access path: %s\n" "${1}"
+  exit 1
 }
 
 show_help() {
@@ -23,6 +30,32 @@ EOF
   exit 0
 }
 
+strip_all() {
+  printf '%s' "${1//$2}"
+}
+
+uuid() {
+  c='89ab'
+  for ((i=0; i < 16; ++i)); do
+    b="$((RANDOM % 256))"
+    case "$i" in
+      6)
+        printf '4%x' "$((b % 16))"
+        ;;
+      8)
+        printf '%c%x' "${c:$RANDOM % ${#c}:1}" "$((b % 16))"
+        ;;
+      3|5|7|9)
+        printf '%02x-' "$b"
+        ;;
+      *)
+        printf '%02x' "$b"
+    esac
+  done
+}
+#endregion helper functions
+
+#region options parsing
 # Option defaults
 data_bags=''
 destination=''
@@ -50,40 +83,12 @@ done
 set -- "${POSITIONAL[@]}"
 
 [[ $# -eq 0 ]] && show_help
+#endregion options parsing
 
+#region main
 cookbook="$(basename "${1}")"
 cookbook_path="${1}"
 cwd="${PWD}"
-
-uuid() {
-  c='89ab'
-  for ((i=0; i < 16; ++i)); do
-    b="$((RANDOM % 256))"
-    case "$i" in
-      6)
-        printf '4%x' "$((b % 16))"
-        ;;
-      8)
-        printf '%c%x' "${c:$RANDOM % ${#c}:1}" "$((b % 16))"
-        ;;
-      3|5|7|9)
-        printf '%02x-' "$b"
-        ;;
-      *)
-        printf '%02x' "$b"
-    esac
-  done
-}
-
-strip_all() {
-  printf '%s' "${1//$2}"
-}
-
-cd_error() {
-  # shellcheck disable=SC1117
-  printf "Can't access path: %s\n" "${1}"
-  exit 1
-}
 
 printf 'Vendoring cookbooks...\n'
 cd "${cookbook_path}" || cd_error "${cookbook_path}"
@@ -110,3 +115,4 @@ rm -rf "${tmpdir}"
 printf '\nTarball at %s\n' "${destination}"
 
 exit 0
+#endregion main
