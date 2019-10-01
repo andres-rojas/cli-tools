@@ -7,7 +7,6 @@ basename() {
 }
 
 cd_error() {
-  # shellcheck disable=SC1117
   printf "Can't access path: %s\n" "${1}"
   exit 1
 }
