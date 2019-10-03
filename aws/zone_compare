@@ -1,0 +1,100 @@
+#!/usr/bin/env sh
+
+#region helper functions
+basename() {
+  : "${1%/}"
+  printf '%s\n' "${_##*/}"
+}
+
+local_ip() {
+  hostname -I | awk 'NR==1 {print $1}'
+}
+
+show_help() {
+  name=$(basename "${0}")
+  cat <<EOF
+${name} will parse a given ZONEFILE for DNS records, and determine if all those records
+are present and identical in the given ZONE of the local AWS-provided DNS server.
+
+Usage:
+  ${name} ZONE ZONEFILE
+  ${name} -h | --help | -?
+
+Options:
+  -h, --help, -?        Show this help message
+EOF
+  exit 0
+}
+#endregion helper functions
+
+#region options parsing
+[[ $# -eq 0 ]] && show_help
+
+# Option defaults
+result_index=0
+when_available='false'
+
+# Options parsing
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -\?|-h|--help)
+      show_help
+      exit 0
+      ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
+  esac
+done
+set -- "${POSITIONAL[@]}"
+
+ZONE="${1}"
+ZONEFILE="${2}"
+#endregion options parsing
+
+#region requirements
+require() {
+  name="${2:-${1}}"
+  command -v "${1}" >/dev/null 2>&1 || {
+    printf 'The %s tool is required to use this script!\n' "${name}" >&2
+    [[ -z "${3}" ]] || printf '\tSee: %s\n' "${3}" >&2
+    exit 1
+  }
+}
+
+require 'dig' 'dig' 'apt-get install dnsutils OR yum install bind-utils'
+#endregion requirements
+
+#region main functions
+subdomains() {
+  ZONEFILE="${1}"
+  awk '$2=="IN" && $1!="@" {print $1}' "${ZONEFILE}" | sort
+}
+
+check_record() {
+  RECORD="${1}"
+  DNS="${2}"
+
+  dig +short "${RECORD}" @"${DNS}" | sort
+}
+#endregion main functions
+
+#region main
+AWS_DNS="169.254.169.253"
+
+for subdomain in $(subdomains ${ZONEFILE}); do
+  TARGET="${subdomain}.${ZONE}"
+
+  LOCAL_RESULT="$(check_record "${TARGET}" "$(local_ip)")"
+  AWS_RESULT="$(check_record "${TARGET}" "${AWS_DNS}")"
+
+  if [ "${LOCAL_RESULT}" = "${AWS_RESULT}" ]; then
+    printf "\033[92m(✔)\033[39m %s matches\n" "${TARGET}"
+  else
+    printf "\033[91m(✘)\033[39m %s does NOT match!\n" "${TARGET}"
+  fi
+done
+
+exit 0
+#endregion main
