@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 
+#region helper functions
 basename() {
   : "${1%/}"
   printf '%s\n' "${_##*/}"
@@ -21,7 +22,9 @@ Options:
 EOF
   exit 0
 }
+#endregion helper functions
 
+#region options parsing
 # Options parsing
 RAW="false"
 POSITIONAL=()
@@ -42,7 +45,9 @@ done
 set -- "${POSITIONAL[@]}"
 
 [[ $# -eq 0 ]] && show_help
+#endregion options parsing
 
+#region requirements
 require() {
   name="${2:-${1}}"
   command -v "${1}" >/dev/null 2>&1 || {
@@ -53,7 +58,9 @@ require() {
 }
 
 require 'kubectl' 'kubectl' 'https://kubernetes.io/docs/tasks/tools/install-kubectl/'
+#endregion requirements
 
+#region main
 RESPONSE="$(kubectl run curl --stdin --tty --rm --image=appropriate/curl -- ${1} 2>/dev/null)"
 RESPONSE="${RESPONSE%%Session ended*}"
 
@@ -65,3 +72,4 @@ else
 fi
 
 exit 0
+#endregion main
