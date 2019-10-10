@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+#region helper functions
 basename() {
   : "${1%/}"
   printf '%s\n' "${_##*/}"
@@ -20,7 +21,9 @@ Options:
 EOF
   exit 0
 }
+#endregion helper functions
 
+#region options parsing
 # Options parsing
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
@@ -36,12 +39,17 @@ done
 set -- "${POSITIONAL[@]}"
 
 [[ $# -eq 0 ]] && show_help
+#endregion options parsing
 
+#region requirements
 command -v openssl >/dev/null 2>&1 || {
   printf 'openssl is required to use this command!\n' >&2
   exit 1
 }
+#endregion requirements
 
+#region main
 echo | openssl s_client -servername "${1}" -connect "${1}":443 2>/dev/null | openssl x509 -text
 
 exit 0
+#endregion main
