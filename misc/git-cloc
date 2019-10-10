@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 
+#region helper functions
 basename() {
   : "${1%/}"
   printf '%s\n' "${_##*/}"
+}
+
+cd_error() {
+  # shellcheck disable=SC1117
+  printf "Can't access path: %s\n" "${1}"
+  exit 1
 }
 
 show_help() {
@@ -19,7 +26,9 @@ Options:
 EOF
   exit 0
 }
+#endregion helper functions
 
+#region options parsing
 # Options parsing
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
@@ -35,7 +44,9 @@ done
 set -- "${POSITIONAL[@]}"
 
 [[ $# -eq 0 ]] && show_help
+#endregion options parsing
 
+#region requirements
 require() {
   name="${2:-${1}}"
   command -v "${1}" >/dev/null 2>&1 || {
@@ -47,13 +58,9 @@ require() {
 
 require 'cloc' 'cloc' 'https://github.com/AlDanial/cloc/'
 require 'git' 'git' 'https://git-scm.com'
+#endregion requirements
 
-cd_error() {
-  # shellcheck disable=SC1117
-  printf "Can't access path: %s\n" "${1}"
-  exit 1
-}
-
+#region main
 total=()
 for repo in "$@"; do
   printf '\n'
@@ -78,3 +85,4 @@ if [ $# -gt 1 ]; then
 fi
 
 exit 0
+#endregion main
