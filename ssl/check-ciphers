@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 
+#region helper functions
 basename() {
   : "${1%/}"
   printf '%s\n' "${_##*/}"
+}
+
+log() {
+  [[ "${verbose}" == "true" ]] && printf '%s\n' "${1}"
 }
 
 show_help() {
@@ -21,7 +26,9 @@ Options:
 EOF
   exit 0
 }
+#endregion helper functions
 
+#region option parsing
 # Option defaults
 delay=1
 verbose="false"
@@ -50,7 +57,9 @@ done
 set -- "${POSITIONAL[@]}"
 
 [[ $# -eq 0 ]] && show_help
+#endregion option parsing
 
+#region requirements
 require() {
   name="${2:-${1}}"
   command -v "${1}" >/dev/null 2>&1 || {
@@ -64,11 +73,9 @@ require 'cut'
 require 'openssl' 'openssl' 'https://openssl.org/'
 require 'sleep'
 require 'tr'
+#endregion requirements
 
-log() {
-  [[ "${verbose}" == "true" ]] && printf '%s\n' "${1}"
-}
-
+#region main
 host="${1}:443" # OpenSSL requires an explicit port number
 
 # shellcheck disable=SC2207
@@ -99,3 +106,4 @@ for cipher in "${ciphers[@]}"; do
 done
 
 exit 0
+#endregion main
