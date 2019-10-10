@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 
+#region helper functions
 basename() {
   : "${1%/}"
   printf '%s\n' "${_##*/}"
@@ -19,7 +20,9 @@ Options:
 EOF
   exit 0
 }
+#endregion helper functions
 
+#region options parsing
 # Options parsing
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
@@ -33,7 +36,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 set -- "${POSITIONAL[@]}"
+#endregion options parsing
 
+#region requirements
 require() {
   name="${2:-${1}}"
   command -v "${1}" >/dev/null 2>&1 || {
@@ -45,7 +50,9 @@ require() {
 
 require 'base64'
 require 'dd'
+#endregion requirements
 
+#region main
 length=${1:-32}
 
 # MacOS uses POSIX utils by default
@@ -64,3 +71,4 @@ pw="${pw:0:${length}}"
 
 printf '%s\n' "${pw}"
 exit 0
+#endregion main
