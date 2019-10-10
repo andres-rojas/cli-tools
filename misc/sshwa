@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+#region helper functions
 basename() {
   : "${1%/}"
   printf '%s\n' "${_##*/}"
@@ -20,7 +21,9 @@ Options:
 EOF
   exit 0
 }
+#endregion helper functions
 
+#region options parsing
 # Options parsing
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
@@ -36,7 +39,9 @@ done
 set -- "${POSITIONAL[@]}"
 
 [[ $# -eq 0 ]] && show_help
+#endregion options parsing
 
+#regopm rrequirements
 require() {
   name="${2:-${1}}"
   command -v "${1}" >/dev/null 2>&1 || {
@@ -49,14 +54,18 @@ require() {
 require 'nc'
 require 'sleep'
 require 'ssh'
+#endregion requirements
 
+#region requirements
 # Stop macOS from taking over BASH_REMATCH
 [[ ${OSTYPE} =~ ^darwin ]] && unset PROMPT_COMMAND
 
 regex() {
   [[ $1 =~ $2 ]] && printf '%s\n' "${BASH_REMATCH[1]}"
 }
+#endregion requirements
 
+#region main
 if [[ $1 =~ @ ]]; then
   host=$(regex "${1}" "^.*@(.*)$")
 else
@@ -73,3 +82,4 @@ printf ' \033[1;32mAnswered!\033[0;39m\n'
 ssh "${1}"
 
 exit 0
+#endregion main
