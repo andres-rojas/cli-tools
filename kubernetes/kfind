@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+#region helper functions
 basename() {
   : "${1%/}"
   printf '%s\n' "${_##*/}"
@@ -19,7 +20,9 @@ Options:
 EOF
   exit 0
 }
+#endregion helpr functions
 
+#region options parsing
 # Options parsing
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
@@ -35,7 +38,9 @@ done
 set -- "${POSITIONAL[@]}"
 
 [[ $# -eq 0 ]] && show_help
+#endregion options parsing
 
+#region requirements
 require() {
   name="${2:-${1}}"
   command -v "${1}" >/dev/null 2>&1 || {
@@ -46,7 +51,10 @@ require() {
 }
 
 require 'kubectl' 'kubectl' 'https://kubernetes.io/docs/tasks/tools/install-kubectl/'
+#endregion requirements
 
+#region main
 kubectl get all --all-namespaces=true 2>&1 | grep ${1} | awk '{print $2}'
 
 exit 0
+#endregion main
