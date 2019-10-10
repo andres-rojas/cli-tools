@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+#region requirements
 if [[ ! ${OSTYPE} =~ ^darwin ]]; then
   printf 'This toggle is only useful for macOS clients!\n' >&2
   exit 1
@@ -18,7 +19,9 @@ require 'dd'
 require 'diskutil'
 require 'file'
 require 'hdiutil'
+#endregion requirements
 
+#region helper functions
 uuid() {
   c='89ab'
   for ((i=0; i < 16; ++i)); do
@@ -42,7 +45,9 @@ uuid() {
 strip_all() {
   printf '%s' "${1//$2}"
 }
+#endregion helper functions
 
+#region main
 id="$(strip_all "$(uuid)" '-')"
 tempFile="/tmp/${id}.img"
 
@@ -99,3 +104,4 @@ else
 fi
 
 exit 0
+#endregion main
