@@ -1,0 +1,78 @@
+#!/usr/bin/env sh
+
+#region helper functions
+basename() {
+  : "${1%/}"
+  printf '%s\n' "${_##*/}"
+}
+
+show_help() {
+  name=$(basename "${0}")
+  cat <<EOF
+${name} will reset the Health Status of every instance in a given AUTOSCALING_GROUP to "Healthy"
+
+Usage:
+  ${name} AUTOSCALING_GROUP
+  ${name} -h | --help | -?
+
+Options:
+  -h, --help, -?        Show this help message
+EOF
+  exit 0
+}
+#endregion helper functions
+
+#region options parsing
+[[ $# -eq 0 ]] && show_help
+
+# Options parsing
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -\?|-h|--help)
+      show_help
+      exit 0
+      ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
+  esac
+done
+set -- "${POSITIONAL[@]}"
+
+autoscaling_group="${1}"
+#endregion options parsing
+
+#region requirements
+require() {
+  name="${2:-${1}}"
+  command -v "${1}" >/dev/null 2>&1 || {
+    printf 'The %s tool is required to use this script!\n' "${name}" >&2
+    [[ -z "${3}" ]] || printf '\tSee: %s\n' "${3}" >&2
+    exit 1
+  }
+}
+
+require 'aws' 'AWS CLI' 'https://docs.aws.amazon.com/cli/latest/userguide/installing.html'
+require 'jq' 'jq' 'https://stedolan.github.io/jq/download/'
+#endregion requirements
+
+#region main functions
+unhealthy_asg_instances() {
+  aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "${1}" \
+    | jq -r '.AutoScalingGroups[].Instances[] | select(.HealthStatus=="Unhealthy") | .InstanceId'
+}
+
+reset_instance_health() {
+  aws autoscaling set-instance-health --instance-id "${1}" --health-status Healthy
+}
+#endregion main functions
+
+#region main
+for instance in $(unhealthy_asg_instances "${autoscaling_group}"); do
+  echo "Resetting ${instance} to Healthy"
+  reset_instance_health ${instance}
+done
+
+exit 0
+#endregion main
