@@ -1,0 +1,101 @@
+#!/usr/bin/env sh
+
+#region helper functions
+basename() {
+  : "${1%/}"
+  printf '%s\n' "${_##*/}"
+}
+
+show_help() {
+  name=$(basename "${0}")
+  cat <<EOF
+${name} will compare a given SELECTOR to a given CONSUMER_GROUP on a target KAFKA and will
+output any running pods that are not attached to a partition in the given CONSUMER_GROUP.
+
+Usage:
+  ${name} SELECTOR KAFKA CONSUMER_GROUP
+  ${name} -h | --help | -?
+
+Options:
+  -h, --help, -?        Show this help message
+EOF
+  exit 0
+}
+#endregion helper functions
+
+#region options parsing
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -\?|-h|--help)
+      show_help
+      exit 0
+      ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
+  esac
+done
+set -- "${POSITIONAL[@]}"
+
+[[ $# -ne 3 ]] && show_help
+
+SELECTOR="${1}"
+KAFKA="${2}"
+GROUP="${3}"
+#endregion options parsing
+
+#region requirements
+require() {
+  name="${2:-${1}}"
+  command -v "${1}" >/dev/null 2>&1 || {
+    printf 'The %s tool is required to use this script!\n' "${name}" >&2
+    [[ -z "${3}" ]] || printf '\tSee: %s\n' "${3}" >&2
+    exit 1
+  }
+}
+
+require 'kubectl' 'kubectl' 'https://kubernetes.io/docs/tasks/tools/install-kubectl/'
+#endregion requirements
+
+#region main functions
+selected_pods() {
+  SELECTOR="${1}"
+  kubectl get pods --selector=${SELECTOR} \
+    | awk 'NR>1 {print $1}' \
+    | sort \
+    | uniq
+}
+
+assigned_consumers() {
+  KAFKA="${1}"
+  GROUP="${2}"
+  ssh "${KAFKA}" -C "\
+    /opt/kafka/current/bin/kafka-consumer-groups.sh \
+      --zookeeper zookeeper.corp.apptentive.com \
+      --describe \
+      --group ${GROUP}\
+  " \
+    | awk 'NR>1 {print $NF}' \
+    | awk -F_ '{print $NF}' \
+    | sed 's/-[0-9][0-9]*-[0-9a-f][0-9a-f]*-[0-9][0-9]*$//g' \
+    | sort \
+    | uniq
+}
+#endregion main functions
+
+#region main
+assigned="$(assigned_consumers ${KAFKA} ${GROUP})"
+selected="$(selected_pods ${SELECTOR})"
+
+printf '%s "%s" pods running in Kubernetes\n' "$(echo "${selected}" | wc -l | awk '{print $NF}')" "${SELECTOR}"
+printf '%s consumers assigned to the "%s" group in %s\n' "$(echo "${assigned}" | wc -l | awk '{print $NF}')" "${GROUP}" "${KAFKA}"
+printf '\n'
+
+echo "These pods don't seem to be doing anything:"
+for pod in ${selected}; do
+  echo "${assigned}" | grep -q "${pod}" || echo "\t${pod}"
+done
+
+exit 0
+#endregion main
