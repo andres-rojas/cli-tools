@@ -1,0 +1,78 @@
+#!/usr/bin/env sh
+
+#region helper functions
+basename() {
+  : "${1%/}"
+  printf '%s\n' "${_##*/}"
+}
+
+show_help() {
+  name=$(basename "${0}")
+  cat <<EOF
+${name} will generate a CSV report of the total size used by the Cassandra cluster,
+indexed by keyspace and table.
+
+Usage:
+  ${name}
+  ${name} -h | --help | -?
+
+Options:
+  -h, --help, -?        Show this help message
+EOF
+  exit 0
+}
+#endregion helper functions
+
+#region options parsing
+# Option defaults
+result_index=0
+when_available='false'
+
+# Options parsing
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -\?|-h|--help)
+      show_help
+      exit 0
+      ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
+  esac
+done
+set -- "${POSITIONAL[@]}"
+
+#endregion options parsing
+
+#region requirements
+require() {
+  name="${2:-${1}}"
+  command -v "${1}" >/dev/null 2>&1 || {
+    printf 'The %s tool is required to use this script!\n' "${name}" >&2
+    [[ -z "${3}" ]] || printf '\tSee: %s\n' "${3}" >&2
+    exit 1
+  }
+}
+
+require 'nodetool'
+#endregion requirements
+
+#region main functions
+cfstats() {
+  FIELD="${1}"
+  SCOPE="${2}"
+  nodetool cfstats "${SCOPE}" | grep "${FIELD}" | awk '{print $NF}' | sort
+}
+#endregion main functions
+
+#region main
+printf "Keyspace,Table,Total Size (bytes)\n"
+
+for keyspace in $(cfstats "Keyspace:"); do
+  for table in $(cfstats "Table:" "${keyspace}"); do
+    total_space="$(cfstats "Space used (total):" "${keyspace}.${table}")"
+    printf "%s,%s,%s\n" "${keyspace}" "${table}" "${total_space}"
+  done
+done
+#endregion main
